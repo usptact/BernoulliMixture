@@ -1,9 +1,6 @@
 ﻿using System;
 using System.IO;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using MicrosoftResearch.Infer.Distributions;
 using MicrosoftResearch.Infer.Maths;
 using MicrosoftResearch.Infer.Models;
@@ -15,6 +12,7 @@ namespace BernoulliMixture
     {
         static void Main(string[] args)
         {
+            /*
             //
             // constants
             //
@@ -22,16 +20,16 @@ namespace BernoulliMixture
             const int numData = 10000;          // total number of examples in a dataset
             const int numDims = 784;            // dimensionality of an example
 
-            const int numClusters = 10;         // requested number of clusters
+            const int numClusters = 20;         // requested number of clusters
 
-            const int batchSize = 100;          // number of examples to use in a batch
+            const int batchSize = 500;          // number of examples to use in a batch
 
             //
             // load the data
             //
 
             // Get data from: https://pjreddie.com/projects/mnist-in-csv/
-            string filePath = @"C:\Users\vladi\Documents\Visual Studio 2017\Projects\BernoulliMixture\mnist_test.csv";
+            string filePath = @"/Users/vlad/Projects/BernoulliMixture/mnist_test.csv";
             StreamReader sr = new StreamReader(filePath);
 
             bool[][] data = new bool[numData][];
@@ -51,11 +49,31 @@ namespace BernoulliMixture
                 row++;
             }
 
+            // shuffle the data
+            Random rnd = new Random();
+            data = data.OrderBy(z => rnd.Next()).ToArray();
+
+            */
+
             //
-            // Define model variables
+            // Generate synthetic data
             //
 
-            Variable<int> nItems = Variable.New<int>();
+            const int numData = 10000;
+            const int numClusters = 7;
+            const int numDims = 10;
+
+            const int batchSize = 200;
+
+            bool[][] data = MakeData();
+
+            Random rnd = new Random();
+
+			//
+			// Define model variables
+			//
+
+			Variable<int> nItems = Variable.New<int>();
 
             Range n = new Range(nItems);
             Range k = new Range(numClusters);
@@ -63,7 +81,7 @@ namespace BernoulliMixture
 
             double[] piPrior = new double[numClusters];
             for (int i = 0; i < numClusters; i++)
-                piPrior[i] = 1.0 / numClusters;
+                piPrior[i] = 1.0;
 
             // define latent variables
             var pi = Variable.Dirichlet(k, piPrior).Named("pi");
@@ -86,7 +104,7 @@ namespace BernoulliMixture
             {
                 using (Variable.ForEach(d))
                 {
-                    tMessage[k][d] = Variable.Observed<Beta>(Beta.Uniform());
+                    tMessage[k][d] = Variable.Observed<Beta>(new Beta(1, 1));
                     Variable.ConstrainEqualRandom(t[k][d], tMessage[k][d]);
                     t[k][d].AddAttribute(QueryTypes.Marginal);
                     t[k][d].AddAttribute(QueryTypes.MarginalDividedByPrior);
@@ -114,7 +132,11 @@ namespace BernoulliMixture
             // inference
             //
 
-            InferenceEngine engine = new InferenceEngine();
+            InferenceEngine engine = new InferenceEngine()
+            {
+                NumberOfIterations = 50,
+                ShowProgress = true
+            };
 
             // marginals to infer (and update in each batch)
             Dirichlet piMarginal = Dirichlet.Uniform(numClusters);
@@ -129,24 +151,82 @@ namespace BernoulliMixture
 
             // online learning in batches
             bool[][] batch = new bool[batchSize][];
+
             for (int b = 0; b < numData / batchSize; b++)
-            {
-                nItems.ObservedValue = batchSize;
+			{
+				nItems.ObservedValue = batchSize;
 
-                // fill the batch with data
-                batch = data.Skip(b * batchSize).Take(batchSize).ToArray();
-                x.ObservedValue = batch;
+				// fill the batch with data
+				batch = data.Skip(b * batchSize).Take(batchSize).ToArray();
+				x.ObservedValue = batch;
 
-                piMarginal = engine.Infer<Dirichlet>(pi);
-                tMarginal = engine.Infer<Beta[][]>(t);
+				//piMarginal = engine.Infer<Dirichlet>(pi);
+				//tMarginal = engine.Infer<Beta[][]>(t);
 
-                piMessage.ObservedValue = engine.Infer<Dirichlet>(pi, QueryTypes.MarginalDividedByPrior);
-                tMessage.ObservedValue = engine.Infer<Beta[][]>(t, QueryTypes.MarginalDividedByPrior);
+                var temp = engine.Infer<Dirichlet>(pi, QueryTypes.MarginalDividedByPrior);
+				//piMessage.ObservedValue = engine.Infer<Dirichlet>(pi, QueryTypes.MarginalDividedByPrior);
+				tMessage.ObservedValue = engine.Infer<Beta[][]>(t, QueryTypes.MarginalDividedByPrior);
+                piMessage.ObservedValue = temp;
 
-                Console.WriteLine("Batch {0}, pi Marginal: {1}", b, piMarginal);
+                //Console.WriteLine("\tBatch {0}, pi Marginal: {1}", b, engine.Infer<Dirichlet>(pi));
+                //Console.WriteLine("\tBatch {0}, pi Marginal: {1}", b, engine.Infer<Beta[][]>(t));
+			}
+
+            piMarginal = engine.Infer<Dirichlet>(pi);
+            tMarginal = engine.Infer<Beta[][]>(t);
+
+            Console.WriteLine(piMarginal.ToString());
+
+            for (int i = 0; i < numClusters; i++) {
+                string output = "";
+                for (int j = 0; j < numDims; j++) {
+                    output = output + " " + string.Format("{0:N2}",tMarginal[i][j].GetMean()) + " ";
+                }
+                Console.WriteLine(output);
             }
 
             Console.Read();
+        }
+
+        static bool[][] MakeData() {
+            int numPoints = 10000;
+            int numDims = 10;
+            int numClusters = 5;
+
+            // prior and pi RV
+            double[] piParams = { 0.2, 0.15, 0.15, 0.4, 0.1 };
+            Discrete pi = new Discrete(piParams);
+
+            // prior and t RV array of arrays
+            double[][] tParams = {
+                new double[] {0.1, 0.1, 0.9, 0.9, 0.5, 0.5, 0.2, 0.1, 0.9, 0.2}, //
+                new double[] {0.5, 0.9, 0.5, 0.1, 0.1, 0.2, 0.5, 0.1, 0.4, 0.9},
+                new double[] {0.9, 0.9, 0.1, 0.1, 0.1, 0.5, 0.5, 0.5, 0.1, 0.7}, //
+                new double[] {0.1, 0.2, 0.3, 0.3, 0.7, 0.1, 0.9, 0.9, 0.3, 0.1}, //
+                new double[] {0.7, 0.3, 0.9, 0.2, 0.2, 0.1, 0.2, 0.3, 0.4, 0.5} //
+            };
+            Bernoulli[][] t = new Bernoulli[numClusters][];
+            for (int i = 0; i < numClusters; i++) {
+                t[i] = new Bernoulli[numDims];
+                for (int j = 0; j < numDims; j++) {
+                    t[i][j] = new Bernoulli(tParams[i][j]);
+                }
+            }
+
+            // declare and init data
+            bool[][] data = new bool[numPoints][];
+            for (int i = 0; i < numPoints; i++)
+                data[i] = new bool[numDims];
+
+            // generate data
+            for (int i = 0; i < numPoints; i++) {
+                int c = pi.Sample();
+                for (int j = 0; j < numDims; j++) {
+                    data[i][j] = t[c][j].Sample();
+                }
+            }
+
+            return data;
         }
     }
 }
