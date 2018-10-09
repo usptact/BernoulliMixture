@@ -1,10 +1,9 @@
 ﻿using System;
-using System.IO;
 using System.Linq;
-using MicrosoftResearch.Infer.Distributions;
-using MicrosoftResearch.Infer.Maths;
-using MicrosoftResearch.Infer.Models;
-using MicrosoftResearch.Infer;
+using Microsoft.ML.Probabilistic;
+using Microsoft.ML.Probabilistic.Models;
+using Microsoft.ML.Probabilistic.Distributions;
+using Microsoft.ML.Probabilistic.Math;
 
 namespace BernoulliMixture
 {
