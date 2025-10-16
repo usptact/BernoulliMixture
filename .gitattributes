@@ -61,3 +61,49 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Project-specific attributes
+###############################################################################
+
+# C# files
+*.cs text diff=csharp
+
+# Project files
+*.csproj text
+*.sln text
+
+# Documentation
+*.md text
+*.txt text
+
+# CSV files (treat as text for diff purposes)
+*.csv text
+
+# License and legal files
+LICENSE text
+COPYING text
+NOTICE text
+
+# Configuration files
+*.config text
+*.json text
+*.xml text
+
+# Script files
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary files (explicitly mark as binary)
+*.dll binary
+*.exe binary
+*.pdb binary
+*.so binary
+*.dylib binary
+
+# Large data files (Git LFS would be ideal for these)
+# Uncomment if using Git LFS:
+#*.csv filter=lfs diff=lfs merge=lfs -text
+#mnist_test.csv filter=lfs diff=lfs merge=lfs -text
